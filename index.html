@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Voucher de Reserva Tours Lagoona</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    :root{
+      --green:#073b2a;--green2:#0b4a37;--ink:#153d3a;--gold:#d4af62;
+      --cream:#f7f1e5;--sand:#ede2cf;--white:#fff;--muted:#6f756f;--danger:#a64b3c;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(140deg,var(--green) 0 24%,var(--cream) 24% 100%);font-family:Jost,sans-serif;color:var(--ink);min-height:100vh}
+    button,input,select,textarea{font:inherit}
+    .shell{max-width:1500px;margin:auto;padding:24px}
+    .top{display:flex;justify-content:space-between;align-items:center;color:white;margin-bottom:20px}
+    .brand{display:flex;gap:16px;align-items:center}
+    .mark{width:48px;height:48px;border:1px solid var(--gold);border-radius:50%;display:grid;place-items:center;color:var(--gold);font-family:"Cormorant Garamond";font-size:24px}
+    .brand h1{font-family:"Cormorant Garamond";font-size:38px;margin:0}
+    .brand small{letter-spacing:.27em;color:var(--gold)}
+    .top-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{border:1px solid rgba(21,61,58,.17);background:white;padding:12px 18px;border-radius:999px;font-weight:600;color:var(--green);cursor:pointer}
+    .btn.primary{background:var(--gold);border-color:var(--gold)}
+    .btn.dark{background:var(--green);color:white;border-color:var(--green)}
+    .btn.danger{background:#f5dfd9;color:var(--danger)}
+    .layout{display:grid;grid-template-columns:minmax(430px,.82fr) minmax(600px,1.18fr);gap:22px}
+    .panel{background:rgba(255,252,245,.96);border:1px solid rgba(212,175,98,.35);border-radius:24px;box-shadow:0 20px 45px rgba(0,0,0,.12)}
+    .form-panel{padding:26px}
+    .panel h2{font-family:"Cormorant Garamond";font-size:31px;margin:0 0 5px}
+    .subtitle{color:var(--muted);margin-bottom:20px}
+    .steps{display:flex;gap:8px;margin-bottom:18px}
+    .step{flex:1;border:1px solid #ddd4c5;padding:9px;text-align:center;border-radius:12px;font-size:13px}
+    .step.active{background:var(--green);color:#fff}
+    .section-title{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:var(--green);font-weight:600;margin:21px 0 10px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .field{display:flex;flex-direction:column;gap:6px}
+    .field.full{grid-column:1/-1}
+    label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+    input,select,textarea{width:100%;border:1px solid #d9d3c8;background:#fffdf8;border-radius:12px;padding:12px;color:var(--ink);outline:none}
+    textarea{min-height:75px;resize:vertical}
+    input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,98,.14)}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+    .status{margin-top:14px;padding:12px;border-radius:12px;background:#eef4f0;display:none}
+    .status.error{display:block;background:#f7e5e0;color:var(--danger)}
+    .status.ok{display:block;background:#e5f0e8;color:var(--green)}
+    .preview-wrap{padding:20px;overflow:auto}
+    .voucher{width:794px;min-height:1123px;margin:auto;background:#fcf8ef;position:relative;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.18);font-family:"Cormorant Garamond",serif}
+    .hero{height:350px;background:linear-gradient(rgba(20,55,53,.33),rgba(20,55,53,.33)),url('https://grupolagunacollection.github.io/MenuActividadesAM/Img/tour%20velero.png') center/cover;position:relative;color:#fff;text-align:center;padding-top:42px}
+    .hero .logo{font-size:48px;letter-spacing:.16em}
+    .hero .tag{font-family:Jost,sans-serif;font-size:11px;letter-spacing:.28em;color:#f0c86c}
+    .hero h3{font-size:54px;font-weight:500;margin:30px 0 0}
+    .voucher-body{padding:28px 48px 34px}
+    .confirmed{text-align:center;font-family:Jost,sans-serif;letter-spacing:.18em;border:1px solid var(--gold);padding:10px;border-radius:8px;width:280px;margin:0 auto 17px}
+    .folio{position:absolute;right:35px;top:298px;width:145px;background:var(--green);color:#fff;border:2px solid var(--gold);border-radius:0 0 12px 12px;padding:18px 8px;text-align:center;font-family:Jost,sans-serif}
+    .folio small{display:block;letter-spacing:.19em;color:#e8d8a8;margin-bottom:8px}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #ddcfb7;border-bottom:1px solid #ddcfb7}
+    .info-col{padding:8px 22px}
+    .info-col:first-child{border-right:1px solid #ddcfb7}
+    .item{padding:12px 0;border-bottom:1px solid #e2d5c1}
+    .item:last-child{border-bottom:0}
+    .item label{font-family:Jost,sans-serif;display:block;font-size:9px;letter-spacing:.16em;margin-bottom:3px}
+    .item .value{font-size:20px;line-height:1.12;min-height:22px}
+    .lower{display:grid;grid-template-columns:1fr 210px;margin-top:18px;border:1px solid #dfd2be}
+    .details{padding:12px 18px}
+    .detail-row{display:grid;grid-template-columns:135px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid #e4d8c6}
+    .detail-row:last-child{border-bottom:0}
+    .detail-row strong{font-family:Jost,sans-serif;font-size:10px;letter-spacing:.14em}
+    .detail-row span{font-family:"Cormorant Garamond";font-size:15px}
+    .tour-img{background:#d8e3df center/cover no-repeat;min-height:230px}
+    .contact{display:flex;justify-content:space-between;padding:24px 10px 6px;font-size:15px}
+    .footer{text-align:center;background:#eee3d2;margin:18px -48px -34px;padding:18px;font-size:16px}
+    .footer em{color:#c89849}
+    .login-overlay{position:fixed;inset:0;background:var(--green);display:grid;place-items:center;z-index:10}
+    .login-box{width:min(430px,90vw);text-align:center;color:white}
+    .login-box h2{font-family:"Cormorant Garamond";font-size:48px;margin:10px}
+    .login-box input{margin:24px 0}
+    .hidden{display:none!important}
+    iframe{display:none}
+    @media(max-width:1050px){
+      .layout{grid-template-columns:1fr}.preview-wrap{padding:10px}
+      .voucher{transform-origin:top left}
+    }
+  </style>
+</head>
+<body>
+<div id="login" class="login-overlay">
+  <div class="login-box">
+    <div class="mark" style="margin:auto">L</div>
+    <h2>Voucher de Reserva</h2>
+    <div style="letter-spacing:.22em;color:var(--gold)">LAGOONA · USO INTERNO</div>
+    <input id="pinInput" type="password" inputmode="numeric" placeholder="Ingresa el PIN">
+    <button class="btn primary" onclick="login()">ACCEDER</button>
+    <div id="loginMsg" style="margin-top:12px;color:#f3b3a7"></div>
+  </div>
+</div>
+
+<div class="shell">
+  <header class="top">
+    <div class="brand">
+      <div class="mark">L</div>
+      <div><h1>Voucher de Reserva</h1><small>TOURS LAGOONA · RECEPCIÓN</small></div>
+    </div>
+    <div class="top-actions">
+      <button class="btn" onclick="newReservation()">Nueva reserva</button>
+      <button class="btn" onclick="searchReservation()">Buscar folio</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel form-panel">
+      <h2>Datos de la reserva</h2>
+      <div class="subtitle">Selecciona la actividad, revisa la información y genera el voucher.</div>
+
+      <div class="steps">
+        <div class="step active">1 · Huésped</div>
+        <div class="step active">2 · Tour</div>
+        <div class="step active">3 · Generar</div>
+      </div>
+
+      <div class="section-title">Huésped</div>
+      <div class="grid">
+        <div class="field full"><label>Nombre del huésped *</label><input id="huesped"></div>
+        <div class="field"><label>Teléfono</label><input id="telefono"></div>
+        <div class="field"><label>Email</label><input id="email" type="email"></div>
+      </div>
+
+      <div class="section-title">Actividad</div>
+      <div class="grid">
+        <div class="field full"><label>Tour / actividad *</label><select id="tourSelect" onchange="applyTour()"><option value="">Cargando catálogo…</option></select></div>
+        <div class="field"><label>Fecha *</label><input id="fechaTour" type="date"></div>
+        <div class="field"><label>Hora *</label><input id="horaTour" type="time"></div>
+        <div class="field"><label>Duración</label><input id="duracion"></div>
+        <div class="field"><label>Participantes *</label><input id="participantes" type="number" min="1" value="2"></div>
+        <div class="field"><label>Punto de encuentro</label><input id="puntoEncuentro"></div>
+        <div class="field"><label>Enlace Google Maps</label><input id="urlMapa"></div>
+        <div class="field full"><label>Incluye</label><textarea id="incluye"></textarea></div>
+        <div class="field full"><label>Recomendaciones</label><textarea id="recomendaciones"></textarea></div>
+      </div>
+
+      <div class="section-title">Pago y control</div>
+      <div class="grid">
+        <div class="field"><label>Total</label><input id="total" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Moneda</label><select id="moneda"><option>MXN</option><option>USD</option><option>EUR</option></select></div>
+        <div class="field"><label>Método de pago</label><select id="metodoPago"><option>Pago al abordar</option><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option><option>Otro</option></select></div>
+        <div class="field"><label>Estado de pago</label><select id="estadoPago"><option>Pendiente</option><option>Pago al abordar</option><option>Pago parcial</option><option>Pagado</option></select></div>
+        <div class="field"><label>Reservado por</label><input id="reservadoPor" value="Recepción Lagoona"></div>
+        <div class="field"><label>Estado de reserva</label><select id="estadoReserva"><option>Confirmada</option><option>Modificada</option><option>Cancelada</option></select></div>
+        <div class="field full"><label>Notas internas</label><textarea id="notasInternas"></textarea></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" onclick="refreshPreview()">Actualizar vista previa</button>
+        <button class="btn dark" onclick="saveAndGenerate()">Guardar y generar PDF</button>
+        <button class="btn" id="openPdfBtn" onclick="openPdf()" disabled>Abrir PDF en Drive</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section class="panel preview-wrap">
+      <div id="voucher" class="voucher">
+        <div id="hero" class="hero">
+          <div class="logo">LAGOONA</div>
+          <div class="tag">TOURS & ACTIVIDADES</div>
+          <h3>Voucher de Reserva</h3>
+        </div>
+        <div class="folio"><small>FOLIO</small><div id="vFolio">POR GENERAR</div></div>
+        <div class="voucher-body">
+          <div class="confirmed" id="vStatus">RESERVA CONFIRMADA</div>
+          <div class="info-grid">
+            <div class="info-col">
+              <div class="item"><label>Huésped</label><div class="value" id="vHuesped">Nombre del huésped</div></div>
+              <div class="item"><label>Tour</label><div class="value" id="vTour">Selecciona una actividad</div></div>
+              <div class="item"><label>Fecha</label><div class="value" id="vFecha">—</div></div>
+              <div class="item"><label>Hora</label><div class="value" id="vHora">—</div></div>
+            </div>
+            <div class="info-col">
+              <div class="item"><label>Duración</label><div class="value" id="vDuracion">—</div></div>
+              <div class="item"><label>Participantes</label><div class="value" id="vParticipantes">—</div></div>
+              <div class="item"><label>Punto de encuentro</label><div class="value" id="vPunto">—</div><div style="font-size:12px" id="vMapa"></div></div>
+              <div class="item"><label>Reservado por</label><div class="value" id="vReservado">Recepción Lagoona</div></div>
+            </div>
+          </div>
+          <div class="lower">
+            <div class="details">
+              <div class="detail-row"><strong>INCLUYE</strong><span id="vIncluye">—</span></div>
+              <div class="detail-row"><strong>RECOMENDACIONES</strong><span id="vRecomendaciones">—</span></div>
+              <div class="detail-row"><strong>TOTAL POR PAGAR</strong><span id="vTotal">$0 MXN</span></div>
+              <div class="detail-row"><strong>MÉTODO DE PAGO</strong><span id="vMetodo">Pago al abordar</span></div>
+            </div>
+            <div id="tourImg" class="tour-img"></div>
+          </div>
+          <div class="contact"><span id="vTelefono">+52 984 241 1410</span><span id="vEmail">grupolagunacollection@gmail.com</span></div>
+          <div class="footer">Presenta este voucher al iniciar tu experiencia.<br><em>Gracias por reservar con Lagoona.</em></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<iframe name="uploadFrame" id="uploadFrame"></iframe>
+<form id="uploadForm" method="post" target="uploadFrame" class="hidden">
+  <input name="action" value="savePdf">
+  <input name="pin" id="upPin">
+  <input name="id" id="upId">
+  <input name="folio" id="upFolio">
+  <input name="huesped" id="upHuesped">
+  <input name="usuario" id="upUsuario">
+  <textarea name="pdfBase64" id="upPdf"></textarea>
+</form>
+
+<script>
+  // Pega aquí la URL de tu Apps Script que termina en /exec
+  const SCRIPT_URL = "PEGAR_AQUI_URL_DE_APPS_SCRIPT";
+  const APP_VERSION = "1.0";
+  let PIN = "";
+  let CATALOG = [];
+  let CURRENT_ID = "";
+  let CURRENT_FOLIO = "";
+  let CURRENT_PDF_URL = "";
+  let PUBLIC_CONFIG = {};
+
+  function login(){
+    PIN = document.getElementById("pinInput").value.trim();
+    if(!PIN){ document.getElementById("loginMsg").textContent="Ingresa el PIN."; return; }
+    jsonp("getCatalog",{},res=>{
+      if(!res.ok){ document.getElementById("loginMsg").textContent=res.error||"No fue posible acceder."; return; }
+      CATALOG=res.catalog||[]; PUBLIC_CONFIG=res.config||{};
+      document.getElementById("login").classList.add("hidden");
+      buildCatalog();
+      applyPublicConfig();
+      setDefaultDate();
+      refreshPreview();
+    });
+  }
+
+  function jsonp(action, params, callback){
+    const cb="cb_"+Date.now()+"_"+Math.floor(Math.random()*9999);
+    window[cb]=data=>{ try{callback(data)}finally{delete window[cb]; script.remove();} };
+    const q=new URLSearchParams({action,pin:PIN,callback:cb,...params,v:APP_VERSION});
+    const script=document.createElement("script");
+    script.src=SCRIPT_URL+"?"+q.toString();
+    script.onerror=()=>{delete window[cb];script.remove();callback({ok:false,error:"No se pudo conectar con Apps Script."});};
+    document.body.appendChild(script);
+  }
+
+  function buildCatalog(){
+    const sel=document.getElementById("tourSelect");
+    sel.innerHTML='<option value="">Selecciona una actividad</option>';
+    CATALOG.forEach(t=>{
+      const o=document.createElement("option");o.value=t.Tour_ID;o.textContent=t.Nombre;sel.appendChild(o);
+    });
+  }
+
+  function applyPublicConfig(){
+    if(PUBLIC_CONFIG.telefono) document.getElementById("vTelefono").textContent=PUBLIC_CONFIG.telefono;
+    if(PUBLIC_CONFIG.email) document.getElementById("vEmail").textContent=PUBLIC_CONFIG.email;
+    if(PUBLIC_CONFIG.reservadoPorDefault) document.getElementById("reservadoPor").value=PUBLIC_CONFIG.reservadoPorDefault;
+    if(PUBLIC_CONFIG.monedaDefault) document.getElementById("moneda").value=PUBLIC_CONFIG.monedaDefault;
+  }
+
+  function setDefaultDate(){
+    const d=new Date(); const iso=d.toISOString().slice(0,10);
+    document.getElementById("fechaTour").value=iso;
+  }
+
+  function selectedTour(){
+    return CATALOG.find(t=>t.Tour_ID===document.getElementById("tourSelect").value)||{};
+  }
+
+  function applyTour(){
+    const t=selectedTour();
+    document.getElementById("duracion").value=t.Duracion||"";
+    document.getElementById("incluye").value=t.Incluye||"";
+    document.getElementById("recomendaciones").value=t.Recomendaciones||"";
+    document.getElementById("total").value=t.Precio_Base||"";
+    document.getElementById("moneda").value=t.Moneda||"MXN";
+    document.getElementById("puntoEncuentro").value=t.Punto_Encuentro||"";
+    document.getElementById("urlMapa").value=t.URL_Mapa||"";
+    refreshPreview();
+  }
+
+  function val(id){return document.getElementById(id).value.trim()}
+  function fmtDate(iso){
+    if(!iso)return "—";
+    const [y,m,d]=iso.split("-");
+    const months=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+    return `${Number(d)} de ${months[Number(m)-1]} de ${y}`;
+  }
+  function fmtTime(t){
+    if(!t)return "—";
+    const [hh,mm]=t.split(":").map(Number);
+    const ap=hh>=12?"PM":"AM"; const h=hh%12||12;
+    return `${String(h).padStart(2,"0")}:${String(mm).padStart(2,"0")} ${ap}`;
+  }
+  function money(n,c){return `$${Number(n||0).toLocaleString("es-MX")} ${c||"MXN"}`}
+
+  function refreshPreview(){
+    const t=selectedTour();
+    document.getElementById("vFolio").textContent=CURRENT_FOLIO||"POR GENERAR";
+    document.getElementById("vHuesped").textContent=val("huesped")||"Nombre del huésped";
+    document.getElementById("vTour").textContent=t.Nombre||"Selecciona una actividad";
+    document.getElementById("vFecha").textContent=fmtDate(val("fechaTour"));
+    document.getElementById("vHora").textContent=fmtTime(val("horaTour"));
+    document.getElementById("vDuracion").textContent=val("duracion")||"—";
+    document.getElementById("vParticipantes").textContent=val("participantes")?`${val("participantes")} personas`:"—";
+    document.getElementById("vPunto").textContent=val("puntoEncuentro")||"—";
+    document.getElementById("vMapa").textContent=val("urlMapa");
+    document.getElementById("vReservado").textContent=val("reservadoPor")||"Recepción Lagoona";
+    document.getElementById("vIncluye").textContent=val("incluye")||"—";
+    document.getElementById("vRecomendaciones").textContent=val("recomendaciones")||"—";
+    document.getElementById("vTotal").textContent=money(val("total"),val("moneda"));
+    document.getElementById("vMetodo").textContent=val("metodoPago")||"—";
+    document.getElementById("vStatus").textContent=`RESERVA ${val("estadoReserva").toUpperCase()}`;
+    const img=t.Imagen_URL||"https://grupolagunacollection.github.io/MenuActividadesAM/Img/tour%20velero.png";
+    document.getElementById("hero").style.backgroundImage=`linear-gradient(rgba(20,55,53,.33),rgba(20,55,53,.33)),url("${img}")`;
+    document.getElementById("tourImg").style.backgroundImage=`url("${img}")`;
+  }
+
+  function payload(){
+    const t=selectedTour();
+    return {
+      huesped:val("huesped"),telefono:val("telefono"),email:val("email"),
+      tourId:t.Tour_ID||"",tour:t.Nombre||"",fechaTour:val("fechaTour"),horaTour:val("horaTour"),
+      duracion:val("duracion"),participantes:val("participantes"),puntoEncuentro:val("puntoEncuentro"),
+      urlMapa:val("urlMapa"),incluye:val("incluye"),recomendaciones:val("recomendaciones"),
+      total:val("total"),moneda:val("moneda"),metodoPago:val("metodoPago"),estadoPago:val("estadoPago"),
+      reservadoPor:val("reservadoPor"),estadoReserva:val("estadoReserva"),notasInternas:val("notasInternas")
+    };
+  }
+
+  function validateForm(){
+    if(!val("huesped")) return "Escribe el nombre del huésped.";
+    if(!document.getElementById("tourSelect").value) return "Selecciona una actividad.";
+    if(!val("fechaTour")) return "Selecciona la fecha.";
+    if(!val("horaTour")) return "Selecciona la hora.";
+    if(!val("participantes")) return "Indica participantes.";
+    return "";
+  }
+
+  function setStatus(msg,type="ok"){
+    const el=document.getElementById("status");el.textContent=msg;el.className="status "+type;
+  }
+
+  function saveAndGenerate(){
+    const err=validateForm(); if(err){setStatus(err,"error");return;}
+    refreshPreview();
+    setStatus("Guardando reserva…","ok");
+    const action=CURRENT_ID?"updateReservation":"createReservation";
+    const p=payload(); if(CURRENT_ID){p.id=CURRENT_ID;p.folio=CURRENT_FOLIO;}
+    jsonp(action,p,async res=>{
+      if(!res.ok){setStatus(res.error||"No se pudo guardar.","error");return;}
+      const r=res.reservation||{};
+      CURRENT_ID=res.id||r.ID_Reserva||CURRENT_ID;
+      CURRENT_FOLIO=res.folio||r.Folio||CURRENT_FOLIO;
+      document.getElementById("vFolio").textContent=CURRENT_FOLIO;
+      setStatus("Generando PDF…","ok");
+      try{
+        const pdfData=await makePdf();
+        uploadPdf(pdfData);
+      }catch(e){setStatus("La reserva se guardó, pero no se pudo generar el PDF: "+e.message,"error");}
+    });
+  }
+
+  async function makePdf(){
+    const el=document.getElementById("voucher");
+    const canvas=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:"#fcf8ef",logging:false});
+    const img=canvas.toDataURL("image/jpeg",.95);
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:"portrait",unit:"px",format:[794,1123]});
+    pdf.addImage(img,"JPEG",0,0,794,1123);
+    pdf.save(`${CURRENT_FOLIO}_${val("huesped").replace(/\s+/g,"_")}.pdf`);
+    return pdf.output("datauristring");
+  }
+
+  function uploadPdf(pdfData){
+    document.getElementById("uploadForm").action=SCRIPT_URL;
+    document.getElementById("upPin").value=PIN;
+    document.getElementById("upId").value=CURRENT_ID;
+    document.getElementById("upFolio").value=CURRENT_FOLIO;
+    document.getElementById("upHuesped").value=val("huesped");
+    document.getElementById("upUsuario").value=val("reservadoPor");
+    document.getElementById("upPdf").value=pdfData;
+    document.getElementById("uploadForm").submit();
+    setStatus("PDF descargado. Guardando copia en Drive…","ok");
+  }
+
+  window.addEventListener("message",ev=>{
+    const d=ev.data||{};
+    if(d.ok&&d.pdfUrl){
+      CURRENT_PDF_URL=d.pdfUrl;
+      document.getElementById("openPdfBtn").disabled=false;
+      setStatus(`Reserva ${d.folio} guardada. PDF disponible en Drive.`,"ok");
+    }else if(d.error){setStatus(d.error,"error");}
+  });
+
+  function openPdf(){if(CURRENT_PDF_URL)window.open(CURRENT_PDF_URL,"_blank")}
+
+  function newReservation(){
+    CURRENT_ID="";CURRENT_FOLIO="";CURRENT_PDF_URL="";
+    document.querySelectorAll("input,textarea").forEach(el=>{
+      if(!["pinInput","reservadoPor"].includes(el.id)) el.value="";
+    });
+    document.getElementById("participantes").value=2;
+    document.getElementById("tourSelect").value="";
+    document.getElementById("moneda").value=PUBLIC_CONFIG.monedaDefault||"MXN";
+    document.getElementById("estadoReserva").value="Confirmada";
+    document.getElementById("estadoPago").value="Pendiente";
+    document.getElementById("metodoPago").value="Pago al abordar";
+    setDefaultDate();refreshPreview();setStatus("Nueva reserva lista.","ok");
+  }
+
+  function searchReservation(){
+    const folio=prompt("Escribe el folio, por ejemplo LG-TR-2026-0001:");
+    if(!folio)return;
+    jsonp("getReservation",{folio},res=>{
+      if(!res.ok){setStatus(res.error,"error");return;}
+      loadReservation(res.reservation);setStatus("Reserva cargada. Puedes editarla y regenerar el PDF.","ok");
+    });
+  }
+
+  function loadReservation(r){
+    CURRENT_ID=r.ID_Reserva;CURRENT_FOLIO=r.Folio;CURRENT_PDF_URL=r.PDF_URL||"";
+    const map={
+      huesped:"Huesped",telefono:"Telefono",email:"Email",fechaTour:"Fecha_Tour",horaTour:"Hora_Tour",
+      duracion:"Duracion",participantes:"Participantes",puntoEncuentro:"Punto_Encuentro",urlMapa:"URL_Mapa",
+      incluye:"Incluye",recomendaciones:"Recomendaciones",total:"Total",moneda:"Moneda",
+      metodoPago:"Metodo_Pago",estadoPago:"Estado_Pago",reservadoPor:"Reservado_Por",
+      estadoReserva:"Estado_Reserva",notasInternas:"Notas_Internas"
+    };
+    Object.keys(map).forEach(id=>{if(document.getElementById(id))document.getElementById(id).value=r[map[id]]||""});
+    document.getElementById("tourSelect").value=r.Tour_ID||"";
+    document.getElementById("openPdfBtn").disabled=!CURRENT_PDF_URL;
+    refreshPreview();
+  }
+</script>
+</body>
+</html>
