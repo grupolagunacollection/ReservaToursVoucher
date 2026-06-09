@@ -15,7 +15,7 @@
       --cream:#f7f1e5;--sand:#ede2cf;--white:#fff;--muted:#6f756f;--danger:#a64b3c;
     }
     *{box-sizing:border-box}
-    body{margin:0;background:linear-gradient(140deg,var(--green) 0 24%,var(--cream) 24% 100%);font-family:Jost,sans-serif;color:var(--ink);min-height:100vh}
+    body{margin:0;background:linear-gradient(140deg,var(--green) 0%,var(--green) 24%,var(--cream) 24%,var(--cream) 100%);font-family:Jost,sans-serif;color:var(--ink);min-height:100vh}
     button,input,select,textarea{font:inherit}
     .shell{max-width:1500px;margin:auto;padding:24px}
     .top{display:flex;justify-content:space-between;align-items:center;color:white;margin-bottom:20px}
@@ -52,14 +52,26 @@
     .voucher{width:794px;min-height:1123px;margin:auto;background:#fcf8ef;position:relative;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.18);font-family:"Cormorant Garamond",serif}
     .hero{
       height:350px;
-      background-image:
-        linear-gradient(rgba(20,55,53,.33),rgba(20,55,53,.33)),
-        url('https://grupolagunacollection.github.io/MenuActividadesAM/Img/muelle-aldea.jpg'),
-        url('https://grupolagunacollection.github.io/MenuActividadesAM/Img/tour%20velero.png');
-      background-position:center,center,center;
-      background-size:cover,cover,cover;
-      background-repeat:no-repeat,no-repeat,no-repeat;
-      position:relative;color:#fff;text-align:center;padding-top:42px
+      background-color:#315d5a;
+      background-image:url('https://grupolagunacollection.github.io/MenuActividadesAM/Img/tour%20velero.png');
+      background-position:center;
+      background-size:cover;
+      background-repeat:no-repeat;
+      position:relative;
+      color:#fff;
+      text-align:center;
+      padding-top:42px
+    }
+    .hero::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:rgba(20,55,53,.33);
+      pointer-events:none
+    }
+    .hero .logo,.hero .tag,.hero h3{
+      position:relative;
+      z-index:1
     }
     .hero .logo{font-size:48px;letter-spacing:.16em}
     .hero .tag{font-family:Jost,sans-serif;font-size:11px;letter-spacing:.28em;color:#f0c86c}
@@ -227,18 +239,51 @@
 <script>
   // Pega aquí la URL de tu Apps Script que termina en /exec
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyEWu030gJpdwQdKJWDvfNUzpbmP4UIN4Eq8GnP72WshZXVR8rC1frlyQsIpDYRtSlR/exec";
-  const APP_VERSION = "2.1";
+  const APP_VERSION = "2.2";
   let PIN = "";
   let CATALOG = [];
   let CURRENT_ID = "";
   let CURRENT_FOLIO = "";
   let CURRENT_PDF_URL = "";
   let PUBLIC_CONFIG = {};
+  let CURRENT_HEADER_IMAGE = "";
+  let CURRENT_TOUR_IMAGE = "";
+
   const HEADER_IMAGE_URL =
     "https://grupolagunacollection.github.io/MenuActividadesAM/Img/muelle-aldea.jpg";
 
   const FALLBACK_TOUR_IMAGE =
     "https://grupolagunacollection.github.io/MenuActividadesAM/Img/tour%20velero.png";
+
+  function resolveImageUrl(url, fallback){
+    return new Promise(resolve=>{
+      const preferred=String(url||"").trim();
+      const backup=String(fallback||"").trim();
+
+      if(!preferred){
+        resolve(backup);
+        return;
+      }
+
+      const img=new Image();
+      img.crossOrigin="anonymous";
+      img.onload=()=>resolve(preferred);
+      img.onerror=()=>resolve(backup);
+      img.src=preferred;
+    });
+  }
+
+  function preloadImage(url){
+    return new Promise(resolve=>{
+      if(!url){ resolve(); return; }
+
+      const img=new Image();
+      img.crossOrigin="anonymous";
+      img.onload=()=>resolve();
+      img.onerror=()=>resolve();
+      img.src=url;
+    });
+  }
 
   function login(){
     PIN = document.getElementById("pinInput").value.trim();
@@ -345,7 +390,7 @@
   }
   function money(n,c){return `$${Number(n||0).toLocaleString("es-MX")} ${c||"MXN"}`}
 
-  function refreshPreview(){
+  async function refreshPreview(){
     const t=selectedTour();
     document.getElementById("vFolio").textContent=CURRENT_FOLIO||"POR GENERAR";
     document.getElementById("vHuesped").textContent=val("huesped")||"Nombre del huésped";
@@ -362,18 +407,23 @@
     document.getElementById("vTotal").textContent=money(val("total"),val("moneda"));
     document.getElementById("vMetodo").textContent=val("metodoPago")||"—";
     document.getElementById("vStatus").textContent=`RESERVA ${val("estadoReserva").toUpperCase()}`;
-    const tourImage = t.Imagen_URL || FALLBACK_TOUR_IMAGE;
+    CURRENT_HEADER_IMAGE = await resolveImageUrl(
+      HEADER_IMAGE_URL,
+      FALLBACK_TOUR_IMAGE
+    );
 
-    // Encabezado fijo. Si muelle-aldea.jpg aún no existe, usa el velero como respaldo.
+    CURRENT_TOUR_IMAGE = await resolveImageUrl(
+      t.Imagen_URL,
+      FALLBACK_TOUR_IMAGE
+    );
+
+    // Encabezado fijo, sin degradado CSS.
     document.getElementById("hero").style.backgroundImage =
-      `linear-gradient(rgba(20,55,53,.33),rgba(20,55,53,.33)),
-       url("${HEADER_IMAGE_URL}"),
-       url("${FALLBACK_TOUR_IMAGE}")`;
+      `url("${CURRENT_HEADER_IMAGE}")`;
 
     // Imagen inferior dinámica según Imagen_URL de Catalogo_Voucher.
-    // Si una actividad no tiene imagen, usa el velero como respaldo.
     document.getElementById("tourImg").style.backgroundImage =
-      `url("${tourImage}"), url("${FALLBACK_TOUR_IMAGE}")`;
+      `url("${CURRENT_TOUR_IMAGE}")`;
   }
 
   function payload(){
@@ -422,13 +472,55 @@
   }
 
   async function makePdf(){
+    await refreshPreview();
+
+    await Promise.all([
+      preloadImage(CURRENT_HEADER_IMAGE),
+      preloadImage(CURRENT_TOUR_IMAGE)
+    ]);
+
     const el=document.getElementById("voucher");
-    const canvas=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:"#fcf8ef",logging:false});
+
+    const canvas=await html2canvas(el,{
+      scale:2,
+      useCORS:true,
+      allowTaint:false,
+      backgroundColor:"#fcf8ef",
+      logging:false,
+      imageTimeout:20000,
+      onclone:clonedDoc=>{
+        // Neutraliza degradados de la página que html2canvas no interpreta bien.
+        clonedDoc.body.style.background="#f7f1e5";
+
+        const clonedHero=clonedDoc.getElementById("hero");
+        if(clonedHero){
+          clonedHero.style.backgroundImage=`url("${CURRENT_HEADER_IMAGE}")`;
+          clonedHero.style.backgroundColor="#315d5a";
+        }
+
+        const clonedTourImg=clonedDoc.getElementById("tourImg");
+        if(clonedTourImg){
+          clonedTourImg.style.backgroundImage=`url("${CURRENT_TOUR_IMAGE}")`;
+          clonedTourImg.style.backgroundColor="#d8e3df";
+        }
+      }
+    });
+
+    if(!canvas.width||!canvas.height){
+      throw new Error("No fue posible renderizar el voucher.");
+    }
+
     const img=canvas.toDataURL("image/jpeg",.95);
     const {jsPDF}=window.jspdf;
-    const pdf=new jsPDF({orientation:"portrait",unit:"px",format:[794,1123]});
+    const pdf=new jsPDF({
+      orientation:"portrait",
+      unit:"px",
+      format:[794,1123]
+    });
+
     pdf.addImage(img,"JPEG",0,0,794,1123);
     pdf.save(`${CURRENT_FOLIO}_${val("huesped").replace(/\s+/g,"_")}.pdf`);
+
     return pdf.output("datauristring");
   }
 
