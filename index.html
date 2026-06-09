@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <style>
     :root{
       --green:#073b2a;--green2:#0b4a37;--ink:#153d3a;--gold:#d4af62;
@@ -239,7 +240,7 @@
 <script>
   // Pega aquí la URL de tu Apps Script que termina en /exec
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyEWu030gJpdwQdKJWDvfNUzpbmP4UIN4Eq8GnP72WshZXVR8rC1frlyQsIpDYRtSlR/exec";
-  const APP_VERSION = "2.5";
+  const APP_VERSION = "2.6";
   let PIN = "";
   let CATALOG = [];
   let CURRENT_ID = "";
@@ -611,6 +612,91 @@
   }
 
   async function makePdf(){
+    await refreshPreview();
+
+    if(!window.htmlToImage){
+      return makePdfNative();
+    }
+
+    const source=document.getElementById("voucher");
+    if(!source){
+      throw new Error("No se encontró el voucher en la página.");
+    }
+
+    try{
+      if(document.fonts && document.fonts.ready){
+        await document.fonts.ready;
+      }
+
+      await Promise.all([
+        preloadImage(CURRENT_HEADER_IMAGE),
+        preloadImage(CURRENT_TOUR_IMAGE)
+      ]);
+
+      await new Promise(resolve =>
+        requestAnimationFrame(() =>
+          requestAnimationFrame(resolve)
+        )
+      );
+
+      /*
+       * html-to-image captura el mismo DOM que se ve en pantalla.
+       * Por eso conserva tipografías, espaciados, líneas, recuadros e imágenes.
+       */
+      const fontEmbedCSS=window.htmlToImage.getFontEmbedCSS
+        ? await window.htmlToImage.getFontEmbedCSS(source)
+        : undefined;
+
+      const imageData=await window.htmlToImage.toJpeg(source,{
+        quality:0.98,
+        pixelRatio:2,
+        backgroundColor:"#fcf8ef",
+        cacheBust:true,
+        width:794,
+        height:1123,
+        canvasWidth:1588,
+        canvasHeight:2246,
+        fontEmbedCSS,
+        style:{
+          width:"794px",
+          height:"1123px",
+          minHeight:"1123px",
+          maxWidth:"none",
+          margin:"0",
+          transform:"none",
+          boxShadow:"none",
+          overflow:"hidden"
+        }
+      });
+
+      if(!imageData || imageData==="data:,"){
+        throw new Error("La captura visual quedó vacía.");
+      }
+
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({
+        orientation:"portrait",
+        unit:"px",
+        format:[794,1123],
+        compress:true
+      });
+
+      pdf.addImage(imageData,"JPEG",0,0,794,1123,undefined,"FAST");
+
+      const safeName=val("huesped").replace(/\s+/g,"_")||"huesped";
+      pdf.save(`${CURRENT_FOLIO}_${safeName}.pdf`);
+
+      return pdf.output("datauristring");
+    }catch(error){
+      console.warn(
+        "No se pudo capturar el diseño idéntico; se utilizará el generador alternativo.",
+        error
+      );
+      return makePdfNative();
+    }
+  }
+
+  async function makePdfNative(){
     await refreshPreview();
 
     const t=selectedTour();
