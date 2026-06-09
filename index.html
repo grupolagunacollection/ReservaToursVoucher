@@ -239,7 +239,7 @@
 <script>
   // Pega aquí la URL de tu Apps Script que termina en /exec
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyEWu030gJpdwQdKJWDvfNUzpbmP4UIN4Eq8GnP72WshZXVR8rC1frlyQsIpDYRtSlR/exec";
-  const APP_VERSION = "2.3";
+  const APP_VERSION = "2.4";
   let PIN = "";
   let CATALOG = [];
   let CURRENT_ID = "";
@@ -479,7 +479,6 @@
       preloadImage(CURRENT_TOUR_IMAGE)
     ]);
 
-    // Espera dos ciclos de renderizado para asegurar medidas finales.
     await new Promise(resolve =>
       requestAnimationFrame(() =>
         requestAnimationFrame(resolve)
@@ -492,14 +491,14 @@
     }
 
     /*
-     * html2canvas puede devolver un canvas vacío cuando el elemento visible
-     * está dentro de un grid responsive o un contenedor desplazable.
-     * Se crea una copia temporal con medidas fijas para generar el PDF.
+     * Se crea una copia temporal dentro del viewport.
+     * La versión anterior la colocaba fuera de pantalla y algunos navegadores
+     * devolvían un canvas completamente blanco.
      */
     const capture=source.cloneNode(true);
     capture.id="voucher-capture";
     capture.style.position="fixed";
-    capture.style.left="-10000px";
+    capture.style.left="0";
     capture.style.top="0";
     capture.style.width="794px";
     capture.style.height="1123px";
@@ -512,8 +511,9 @@
     capture.style.opacity="1";
     capture.style.overflow="hidden";
     capture.style.boxShadow="none";
-    capture.style.zIndex="-1";
+    capture.style.zIndex="2147483646";
     capture.style.background="#fcf8ef";
+    capture.style.pointerEvents="none";
 
     const captureHero=capture.querySelector("#hero");
     if(captureHero){
@@ -529,9 +529,34 @@
       captureTourImg.style.backgroundColor="#d8e3df";
     }
 
+    /*
+     * Capa visual breve para evitar que el usuario vea el voucher temporal.
+     * No forma parte del elemento capturado.
+     */
+    const curtain=document.createElement("div");
+    curtain.id="pdf-curtain";
+    curtain.style.position="fixed";
+    curtain.style.inset="0";
+    curtain.style.background="#f7f1e5";
+    curtain.style.zIndex="2147483647";
+    curtain.style.display="grid";
+    curtain.style.placeItems="center";
+    curtain.style.fontFamily="Jost, sans-serif";
+    curtain.style.color="#073b2a";
+    curtain.style.fontWeight="600";
+    curtain.style.letterSpacing=".08em";
+    curtain.textContent="GENERANDO VOUCHER…";
+
     document.body.appendChild(capture);
+    document.body.appendChild(curtain);
 
     try{
+      await new Promise(resolve =>
+        requestAnimationFrame(() =>
+          requestAnimationFrame(resolve)
+        )
+      );
+
       const rect=capture.getBoundingClientRect();
 
       if(!Number.isFinite(rect.width) || !Number.isFinite(rect.height) ||
@@ -563,6 +588,11 @@
           clonedDoc.body.style.margin="0";
           clonedDoc.body.style.background="#fcf8ef";
 
+          const clonedCurtain=clonedDoc.getElementById("pdf-curtain");
+          if(clonedCurtain){
+            clonedCurtain.remove();
+          }
+
           const clonedCapture=clonedDoc.getElementById("voucher-capture");
           if(clonedCapture){
             clonedCapture.style.position="absolute";
@@ -575,12 +605,45 @@
             clonedCapture.style.display="block";
             clonedCapture.style.visibility="visible";
             clonedCapture.style.opacity="1";
+            clonedCapture.style.zIndex="1";
           }
         }
       });
 
       if(!canvas || !canvas.width || !canvas.height){
         throw new Error("html2canvas devolvió una imagen vacía.");
+      }
+
+      /*
+       * Verifica que la imagen no sea completamente blanca.
+       * Se muestrean varios puntos antes de crear el PDF.
+       */
+      const context=canvas.getContext("2d");
+      const samplePoints=[
+        [20,20],
+        [canvas.width/2,40],
+        [canvas.width/2,canvas.height/4],
+        [canvas.width/2,canvas.height/2],
+        [canvas.width-20,canvas.height-20]
+      ];
+
+      let nonWhitePixelFound=false;
+      for(const [x,y] of samplePoints){
+        const pixel=context.getImageData(
+          Math.max(0,Math.floor(x)),
+          Math.max(0,Math.floor(y)),
+          1,
+          1
+        ).data;
+
+        if(pixel[3] > 0 && (pixel[0] < 248 || pixel[1] < 248 || pixel[2] < 248)){
+          nonWhitePixelFound=true;
+          break;
+        }
+      }
+
+      if(!nonWhitePixelFound){
+        throw new Error("La captura del voucher resultó vacía.");
       }
 
       const imageData=canvas.toDataURL("image/jpeg",.95);
@@ -603,6 +666,9 @@
 
       return pdf.output("datauristring");
     } finally {
+      if(curtain.parentNode){
+        curtain.parentNode.removeChild(curtain);
+      }
       if(capture.parentNode){
         capture.parentNode.removeChild(capture);
       }
