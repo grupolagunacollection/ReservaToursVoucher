@@ -125,8 +125,9 @@
       <div class="section-title">Huésped</div>
       <div class="grid">
         <div class="field full"><label>Nombre del huésped *</label><input id="huesped"></div>
-        <div class="field"><label>Teléfono</label><input id="telefono"></div>
+        <div class="field"><label>Teléfono / WhatsApp</label><input id="telefono"></div>
         <div class="field"><label>Email</label><input id="email" type="email"></div>
+        <div class="field full"><label>Edificio y departamento</label><input id="unidad" placeholder="Ej. Yaxché 601"></div>
       </div>
 
       <div class="section-title">Actividad</div>
@@ -135,7 +136,7 @@
         <div class="field"><label>Fecha *</label><input id="fechaTour" type="date"></div>
         <div class="field"><label>Hora *</label><input id="horaTour" type="time"></div>
         <div class="field"><label>Duración</label><input id="duracion"></div>
-        <div class="field"><label>Participantes *</label><input id="participantes" type="number" min="1" value="2"></div>
+        <div class="field"><label>Participantes *</label><input id="participantes" type="number" min="1" value="2" oninput="recalculateTotal()"></div>
         <div class="field"><label>Punto de encuentro</label><input id="puntoEncuentro"></div>
         <div class="field"><label>Enlace Google Maps</label><input id="urlMapa"></div>
         <div class="field full"><label>Incluye</label><textarea id="incluye"></textarea></div>
@@ -216,7 +217,7 @@
 <script>
   // Pega aquí la URL de tu Apps Script que termina en /exec
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyEWu030gJpdwQdKJWDvfNUzpbmP4UIN4Eq8GnP72WshZXVR8rC1frlyQsIpDYRtSlR/exec";
-  const APP_VERSION = "1.0";
+  const APP_VERSION = "2.0";
   let PIN = "";
   let CATALOG = [];
   let CURRENT_ID = "";
@@ -252,7 +253,10 @@
     const sel=document.getElementById("tourSelect");
     sel.innerHTML='<option value="">Selecciona una actividad</option>';
     CATALOG.forEach(t=>{
-      const o=document.createElement("option");o.value=t.Tour_ID;o.textContent=t.Nombre;sel.appendChild(o);
+      const o=document.createElement("option");
+      o.value=t.Tour_ID;
+      o.textContent=t.Clave_Formulario || t.Nombre_Voucher || t.Nombre_Registro || t.Tour_ID;
+      sel.appendChild(o);
     });
   }
 
@@ -277,10 +281,29 @@
     document.getElementById("duracion").value=t.Duracion||"";
     document.getElementById("incluye").value=t.Incluye||"";
     document.getElementById("recomendaciones").value=t.Recomendaciones||"";
-    document.getElementById("total").value=t.Precio_Base||"";
-    document.getElementById("moneda").value=t.Moneda||"MXN";
+    document.getElementById("moneda").value="MXN";
     document.getElementById("puntoEncuentro").value=t.Punto_Encuentro||"";
     document.getElementById("urlMapa").value=t.URL_Mapa||"";
+    recalculateTotal();
+    refreshPreview();
+  }
+
+  function recalculateTotal(){
+    const t=selectedTour();
+    const pax=Number(val("participantes")||0);
+    const base=Number(String(t.Precio_Base||0).replace(/[$,\s]/g,""));
+    const included=Number(t.Pax_Incluidos||0);
+    const extra=Number(String(t.Precio_Pax_Extra||0).replace(/[$,\s]/g,""));
+    const max=Number(t.Pax_Max||0);
+    const type=String(t.Tipo_Cobro||"").toLowerCase();
+    if(max>0 && pax>max){
+      setStatus(`Esta opción admite un máximo de ${max} personas.`,"error");
+      return;
+    }
+    let total=base;
+    if(type==="por persona") total=base*pax;
+    else if(type==="privado con extras") total=base+Math.max(0,pax-included)*extra;
+    document.getElementById("total").value=total||"";
     refreshPreview();
   }
 
@@ -303,7 +326,7 @@
     const t=selectedTour();
     document.getElementById("vFolio").textContent=CURRENT_FOLIO||"POR GENERAR";
     document.getElementById("vHuesped").textContent=val("huesped")||"Nombre del huésped";
-    document.getElementById("vTour").textContent=t.Nombre||"Selecciona una actividad";
+    document.getElementById("vTour").textContent=t.Nombre_Voucher||t.Nombre_Registro||"Selecciona una actividad";
     document.getElementById("vFecha").textContent=fmtDate(val("fechaTour"));
     document.getElementById("vHora").textContent=fmtTime(val("horaTour"));
     document.getElementById("vDuracion").textContent=val("duracion")||"—";
@@ -324,8 +347,8 @@
   function payload(){
     const t=selectedTour();
     return {
-      huesped:val("huesped"),telefono:val("telefono"),email:val("email"),
-      tourId:t.Tour_ID||"",tour:t.Nombre||"",fechaTour:val("fechaTour"),horaTour:val("horaTour"),
+      huesped:val("huesped"),telefono:val("telefono"),email:val("email"),unidad:val("unidad"),
+      tourId:t.Tour_ID||"",tour:t.Nombre_Registro||t.Clave_Formulario||t.Nombre_Voucher||"",tourClave:t.Clave_Formulario||"",fechaTour:val("fechaTour"),horaTour:val("horaTour"),
       duracion:val("duracion"),participantes:val("participantes"),puntoEncuentro:val("puntoEncuentro"),
       urlMapa:val("urlMapa"),incluye:val("incluye"),recomendaciones:val("recomendaciones"),
       total:val("total"),moneda:val("moneda"),metodoPago:val("metodoPago"),estadoPago:val("estadoPago"),
@@ -350,7 +373,7 @@
     const err=validateForm(); if(err){setStatus(err,"error");return;}
     refreshPreview();
     setStatus("Guardando reserva…","ok");
-    const action=CURRENT_ID?"updateReservation":"createReservation";
+    const action=CURRENT_ID?"updateReservation":"createInternalReservation";
     const p=payload(); if(CURRENT_ID){p.id=CURRENT_ID;p.folio=CURRENT_FOLIO;}
     jsonp(action,p,async res=>{
       if(!res.ok){setStatus(res.error||"No se pudo guardar.","error");return;}
@@ -402,7 +425,7 @@
 
   function newReservation(){
     CURRENT_ID="";CURRENT_FOLIO="";CURRENT_PDF_URL="";
-    document.querySelectorAll("input,textarea").forEach(el=>{
+    document.querySelectorAll(".form-panel input,.form-panel textarea").forEach(el=>{
       if(!["pinInput","reservadoPor"].includes(el.id)) el.value="";
     });
     document.getElementById("participantes").value=2;
@@ -415,18 +438,28 @@
   }
 
   function searchReservation(){
-    const folio=prompt("Escribe el folio, por ejemplo LG-TR-2026-0001:");
-    if(!folio)return;
-    jsonp("getReservation",{folio},res=>{
+    const query=prompt("Escribe # Reserva, folio o nombre del huésped:");
+    if(!query)return;
+    jsonp("searchReservations",{query},res=>{
       if(!res.ok){setStatus(res.error,"error");return;}
-      loadReservation(res.reservation);setStatus("Reserva cargada. Puedes editarla y regenerar el PDF.","ok");
+      const list=res.reservations||[];
+      if(!list.length){setStatus("No se encontraron reservas.","error");return;}
+      let selected=list[0];
+      if(list.length>1){
+        const menu=list.map((r,i)=>`${i+1}. #${r.Numero_Reserva} · ${r.Huesped} · ${r.Tour} · ${r.Fecha_Tour}`).join("\n");
+        const choice=Number(prompt("Se encontraron varias reservas:\n\n"+menu+"\n\nEscribe el número de opción:"));
+        if(!choice||!list[choice-1])return;
+        selected=list[choice-1];
+      }
+      loadReservation(selected);
+      setStatus("Reserva cargada desde Lagoona_Reservas_Comisiones.","ok");
     });
   }
 
   function loadReservation(r){
-    CURRENT_ID=r.ID_Reserva;CURRENT_FOLIO=r.Folio;CURRENT_PDF_URL=r.PDF_URL||"";
+    CURRENT_ID=r.Numero_Reserva||r.ID_Reserva;CURRENT_FOLIO=r.Folio;CURRENT_PDF_URL=r.PDF_URL||"";
     const map={
-      huesped:"Huesped",telefono:"Telefono",email:"Email",fechaTour:"Fecha_Tour",horaTour:"Hora_Tour",
+      huesped:"Huesped",telefono:"Telefono",email:"Email",unidad:"Unidad",fechaTour:"Fecha_Tour",horaTour:"Hora_Tour",
       duracion:"Duracion",participantes:"Participantes",puntoEncuentro:"Punto_Encuentro",urlMapa:"URL_Mapa",
       incluye:"Incluye",recomendaciones:"Recomendaciones",total:"Total",moneda:"Moneda",
       metodoPago:"Metodo_Pago",estadoPago:"Estado_Pago",reservadoPor:"Reservado_Por",
