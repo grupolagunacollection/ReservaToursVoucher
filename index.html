@@ -239,7 +239,7 @@
 <script>
   // Pega aquí la URL de tu Apps Script que termina en /exec
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyEWu030gJpdwQdKJWDvfNUzpbmP4UIN4Eq8GnP72WshZXVR8rC1frlyQsIpDYRtSlR/exec";
-  const APP_VERSION = "2.2";
+  const APP_VERSION = "2.3";
   let PIN = "";
   let CATALOG = [];
   let CURRENT_ID = "";
@@ -479,49 +479,134 @@
       preloadImage(CURRENT_TOUR_IMAGE)
     ]);
 
-    const el=document.getElementById("voucher");
+    // Espera dos ciclos de renderizado para asegurar medidas finales.
+    await new Promise(resolve =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(resolve)
+      )
+    );
 
-    const canvas=await html2canvas(el,{
-      scale:2,
-      useCORS:true,
-      allowTaint:false,
-      backgroundColor:"#fcf8ef",
-      logging:false,
-      imageTimeout:20000,
-      onclone:clonedDoc=>{
-        // Neutraliza degradados de la página que html2canvas no interpreta bien.
-        clonedDoc.body.style.background="#f7f1e5";
-
-        const clonedHero=clonedDoc.getElementById("hero");
-        if(clonedHero){
-          clonedHero.style.backgroundImage=`url("${CURRENT_HEADER_IMAGE}")`;
-          clonedHero.style.backgroundColor="#315d5a";
-        }
-
-        const clonedTourImg=clonedDoc.getElementById("tourImg");
-        if(clonedTourImg){
-          clonedTourImg.style.backgroundImage=`url("${CURRENT_TOUR_IMAGE}")`;
-          clonedTourImg.style.backgroundColor="#d8e3df";
-        }
-      }
-    });
-
-    if(!canvas.width||!canvas.height){
-      throw new Error("No fue posible renderizar el voucher.");
+    const source=document.getElementById("voucher");
+    if(!source){
+      throw new Error("No se encontró el voucher en la página.");
     }
 
-    const img=canvas.toDataURL("image/jpeg",.95);
-    const {jsPDF}=window.jspdf;
-    const pdf=new jsPDF({
-      orientation:"portrait",
-      unit:"px",
-      format:[794,1123]
-    });
+    /*
+     * html2canvas puede devolver un canvas vacío cuando el elemento visible
+     * está dentro de un grid responsive o un contenedor desplazable.
+     * Se crea una copia temporal con medidas fijas para generar el PDF.
+     */
+    const capture=source.cloneNode(true);
+    capture.id="voucher-capture";
+    capture.style.position="fixed";
+    capture.style.left="-10000px";
+    capture.style.top="0";
+    capture.style.width="794px";
+    capture.style.height="1123px";
+    capture.style.minHeight="1123px";
+    capture.style.maxWidth="none";
+    capture.style.margin="0";
+    capture.style.transform="none";
+    capture.style.display="block";
+    capture.style.visibility="visible";
+    capture.style.opacity="1";
+    capture.style.overflow="hidden";
+    capture.style.boxShadow="none";
+    capture.style.zIndex="-1";
+    capture.style.background="#fcf8ef";
 
-    pdf.addImage(img,"JPEG",0,0,794,1123);
-    pdf.save(`${CURRENT_FOLIO}_${val("huesped").replace(/\s+/g,"_")}.pdf`);
+    const captureHero=capture.querySelector("#hero");
+    if(captureHero){
+      captureHero.style.backgroundImage=`url("${CURRENT_HEADER_IMAGE}")`;
+      captureHero.style.backgroundColor="#315d5a";
+      captureHero.style.width="794px";
+      captureHero.style.height="350px";
+    }
 
-    return pdf.output("datauristring");
+    const captureTourImg=capture.querySelector("#tourImg");
+    if(captureTourImg){
+      captureTourImg.style.backgroundImage=`url("${CURRENT_TOUR_IMAGE}")`;
+      captureTourImg.style.backgroundColor="#d8e3df";
+    }
+
+    document.body.appendChild(capture);
+
+    try{
+      const rect=capture.getBoundingClientRect();
+
+      if(!Number.isFinite(rect.width) || !Number.isFinite(rect.height) ||
+         rect.width <= 0 || rect.height <= 0){
+        throw new Error(
+          `El voucher no tiene medidas válidas (${rect.width} × ${rect.height}).`
+        );
+      }
+
+      const canvas=await html2canvas(capture,{
+        scale:2,
+        width:794,
+        height:1123,
+        windowWidth:794,
+        windowHeight:1123,
+        scrollX:0,
+        scrollY:0,
+        useCORS:true,
+        allowTaint:false,
+        backgroundColor:"#fcf8ef",
+        logging:false,
+        imageTimeout:20000,
+        removeContainer:true,
+        onclone:clonedDoc=>{
+          clonedDoc.documentElement.style.width="794px";
+          clonedDoc.documentElement.style.height="1123px";
+          clonedDoc.body.style.width="794px";
+          clonedDoc.body.style.height="1123px";
+          clonedDoc.body.style.margin="0";
+          clonedDoc.body.style.background="#fcf8ef";
+
+          const clonedCapture=clonedDoc.getElementById("voucher-capture");
+          if(clonedCapture){
+            clonedCapture.style.position="absolute";
+            clonedCapture.style.left="0";
+            clonedCapture.style.top="0";
+            clonedCapture.style.width="794px";
+            clonedCapture.style.height="1123px";
+            clonedCapture.style.minHeight="1123px";
+            clonedCapture.style.transform="none";
+            clonedCapture.style.display="block";
+            clonedCapture.style.visibility="visible";
+            clonedCapture.style.opacity="1";
+          }
+        }
+      });
+
+      if(!canvas || !canvas.width || !canvas.height){
+        throw new Error("html2canvas devolvió una imagen vacía.");
+      }
+
+      const imageData=canvas.toDataURL("image/jpeg",.95);
+      if(!imageData || imageData==="data:,"){
+        throw new Error("No fue posible convertir el voucher en imagen.");
+      }
+
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({
+        orientation:"portrait",
+        unit:"px",
+        format:[794,1123],
+        compress:true
+      });
+
+      pdf.addImage(imageData,"JPEG",0,0,794,1123);
+      pdf.save(
+        `${CURRENT_FOLIO}_${val("huesped").replace(/\s+/g,"_")}.pdf`
+      );
+
+      return pdf.output("datauristring");
+    } finally {
+      if(capture.parentNode){
+        capture.parentNode.removeChild(capture);
+      }
+    }
   }
 
   function uploadPdf(pdfData){
