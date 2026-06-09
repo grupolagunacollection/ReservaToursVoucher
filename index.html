@@ -50,7 +50,17 @@
     .status.ok{display:block;background:#e5f0e8;color:var(--green)}
     .preview-wrap{padding:20px;overflow:auto}
     .voucher{width:794px;min-height:1123px;margin:auto;background:#fcf8ef;position:relative;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.18);font-family:"Cormorant Garamond",serif}
-    .hero{height:350px;background:linear-gradient(rgba(20,55,53,.33),rgba(20,55,53,.33)),url('https://grupolagunacollection.github.io/MenuActividadesAM/Img/tour%20velero.png') center/cover;position:relative;color:#fff;text-align:center;padding-top:42px}
+    .hero{
+      height:350px;
+      background-image:
+        linear-gradient(rgba(20,55,53,.33),rgba(20,55,53,.33)),
+        url('https://grupolagunacollection.github.io/MenuActividadesAM/Img/muelle-aldea.jpg'),
+        url('https://grupolagunacollection.github.io/MenuActividadesAM/Img/tour%20velero.png');
+      background-position:center,center,center;
+      background-size:cover,cover,cover;
+      background-repeat:no-repeat,no-repeat,no-repeat;
+      position:relative;color:#fff;text-align:center;padding-top:42px
+    }
     .hero .logo{font-size:48px;letter-spacing:.16em}
     .hero .tag{font-family:Jost,sans-serif;font-size:11px;letter-spacing:.28em;color:#f0c86c}
     .hero h3{font-size:54px;font-weight:500;margin:30px 0 0}
@@ -217,13 +227,18 @@
 <script>
   // Pega aquí la URL de tu Apps Script que termina en /exec
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyEWu030gJpdwQdKJWDvfNUzpbmP4UIN4Eq8GnP72WshZXVR8rC1frlyQsIpDYRtSlR/exec";
-  const APP_VERSION = "2.0";
+  const APP_VERSION = "2.1";
   let PIN = "";
   let CATALOG = [];
   let CURRENT_ID = "";
   let CURRENT_FOLIO = "";
   let CURRENT_PDF_URL = "";
   let PUBLIC_CONFIG = {};
+  const HEADER_IMAGE_URL =
+    "https://grupolagunacollection.github.io/MenuActividadesAM/Img/muelle-aldea.jpg";
+
+  const FALLBACK_TOUR_IMAGE =
+    "https://grupolagunacollection.github.io/MenuActividadesAM/Img/tour%20velero.png";
 
   function login(){
     PIN = document.getElementById("pinInput").value.trim();
@@ -267,9 +282,15 @@
     if(PUBLIC_CONFIG.monedaDefault) document.getElementById("moneda").value=PUBLIC_CONFIG.monedaDefault;
   }
 
+  function localISODate(date = new Date()){
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
   function setDefaultDate(){
-    const d=new Date(); const iso=d.toISOString().slice(0,10);
-    document.getElementById("fechaTour").value=iso;
+    document.getElementById("fechaTour").value = localISODate();
   }
 
   function selectedTour(){
@@ -297,7 +318,9 @@
     const max=Number(t.Pax_Max||0);
     const type=String(t.Tipo_Cobro||"").toLowerCase();
     if(max>0 && pax>max){
+      document.getElementById("total").value="";
       setStatus(`Esta opción admite un máximo de ${max} personas.`,"error");
+      refreshPreview();
       return;
     }
     let total=base;
@@ -339,9 +362,18 @@
     document.getElementById("vTotal").textContent=money(val("total"),val("moneda"));
     document.getElementById("vMetodo").textContent=val("metodoPago")||"—";
     document.getElementById("vStatus").textContent=`RESERVA ${val("estadoReserva").toUpperCase()}`;
-    const img=t.Imagen_URL||"https://grupolagunacollection.github.io/MenuActividadesAM/Img/tour%20velero.png";
-    document.getElementById("hero").style.backgroundImage=`linear-gradient(rgba(20,55,53,.33),rgba(20,55,53,.33)),url("${img}")`;
-    document.getElementById("tourImg").style.backgroundImage=`url("${img}")`;
+    const tourImage = t.Imagen_URL || FALLBACK_TOUR_IMAGE;
+
+    // Encabezado fijo. Si muelle-aldea.jpg aún no existe, usa el velero como respaldo.
+    document.getElementById("hero").style.backgroundImage =
+      `linear-gradient(rgba(20,55,53,.33),rgba(20,55,53,.33)),
+       url("${HEADER_IMAGE_URL}"),
+       url("${FALLBACK_TOUR_IMAGE}")`;
+
+    // Imagen inferior dinámica según Imagen_URL de Catalogo_Voucher.
+    // Si una actividad no tiene imagen, usa el velero como respaldo.
+    document.getElementById("tourImg").style.backgroundImage =
+      `url("${tourImage}"), url("${FALLBACK_TOUR_IMAGE}")`;
   }
 
   function payload(){
