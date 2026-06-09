@@ -239,7 +239,7 @@
 <script>
   // Pega aquí la URL de tu Apps Script que termina en /exec
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyEWu030gJpdwQdKJWDvfNUzpbmP4UIN4Eq8GnP72WshZXVR8rC1frlyQsIpDYRtSlR/exec";
-  const APP_VERSION = "2.4";
+  const APP_VERSION = "2.5";
   let PIN = "";
   let CATALOG = [];
   let CURRENT_ID = "";
@@ -471,208 +471,411 @@
     });
   }
 
+  function loadImageElement(url){
+    return new Promise((resolve,reject)=>{
+      const img=new Image();
+      img.crossOrigin="anonymous";
+      img.onload=()=>resolve(img);
+      img.onerror=()=>reject(new Error("No se pudo cargar la imagen: "+url));
+      img.src=url;
+    });
+  }
+
+  async function imageCoverDataUrl(primaryUrl, fallbackUrl, width, height){
+    let img;
+
+    try{
+      img=await loadImageElement(primaryUrl);
+    }catch(error){
+      if(!fallbackUrl || fallbackUrl===primaryUrl){
+        return "";
+      }
+      try{
+        img=await loadImageElement(fallbackUrl);
+      }catch(secondError){
+        return "";
+      }
+    }
+
+    const canvas=document.createElement("canvas");
+    canvas.width=width;
+    canvas.height=height;
+
+    const ctx=canvas.getContext("2d");
+    ctx.fillStyle="#d8e3df";
+    ctx.fillRect(0,0,width,height);
+
+    const scale=Math.max(width/img.naturalWidth,height/img.naturalHeight);
+    const drawWidth=img.naturalWidth*scale;
+    const drawHeight=img.naturalHeight*scale;
+    const x=(width-drawWidth)/2;
+    const y=(height-drawHeight)/2;
+
+    ctx.drawImage(img,x,y,drawWidth,drawHeight);
+    return canvas.toDataURL("image/jpeg",0.92);
+  }
+
+  function pdfHexToRgb(hex){
+    const clean=String(hex).replace("#","");
+    const full=clean.length===3
+      ? clean.split("").map(ch=>ch+ch).join("")
+      : clean;
+
+    return [
+      parseInt(full.substring(0,2),16),
+      parseInt(full.substring(2,4),16),
+      parseInt(full.substring(4,6),16)
+    ];
+  }
+
+  function pdfSetFill(pdf,hex){
+    const [r,g,b]=pdfHexToRgb(hex);
+    pdf.setFillColor(r,g,b);
+  }
+
+  function pdfSetDraw(pdf,hex){
+    const [r,g,b]=pdfHexToRgb(hex);
+    pdf.setDrawColor(r,g,b);
+  }
+
+  function pdfSetText(pdf,hex){
+    const [r,g,b]=pdfHexToRgb(hex);
+    pdf.setTextColor(r,g,b);
+  }
+
+  function pdfText(pdf,text,x,y,options={}){
+    const {
+      font="times",
+      style="normal",
+      size=16,
+      color="#153d3a",
+      align="left",
+      maxWidth=0,
+      lineHeight=1.12
+    }=options;
+
+    pdf.setFont(font,style);
+    pdf.setFontSize(size);
+    pdfSetText(pdf,color);
+
+    const value=String(text===undefined||text===null?"":text);
+    const lines=maxWidth
+      ? pdf.splitTextToSize(value,maxWidth)
+      : [value];
+
+    pdf.setLineHeightFactor(lineHeight);
+    pdf.text(lines,x,y,{align});
+    return lines.length;
+  }
+
+  function pdfInfoItem(pdf,label,value,x,y,width){
+    pdfText(pdf,label.toUpperCase(),x,y,{
+      font:"helvetica",
+      style:"bold",
+      size:8,
+      color:"#153d3a"
+    });
+
+    const lines=pdfText(pdf,value||"—",x,y+21,{
+      font:"times",
+      style:"normal",
+      size:16,
+      color:"#153d3a",
+      maxWidth:width
+    });
+
+    const bottom=y+34+(lines-1)*16;
+    pdfSetDraw(pdf,"#ddcfb7");
+    pdf.setLineWidth(0.7);
+    pdf.line(x,bottom,x+width,bottom);
+    return bottom+18;
+  }
+
+  function pdfDetailRow(pdf,label,value,x,y,labelWidth,valueWidth){
+    pdfText(pdf,label,x,y,{
+      font:"helvetica",
+      style:"bold",
+      size:8,
+      color:"#153d3a"
+    });
+
+    const lines=pdfText(pdf,value||"—",x+labelWidth,y,{
+      font:"times",
+      style:"normal",
+      size:12,
+      color:"#153d3a",
+      maxWidth:valueWidth
+    });
+
+    return Math.max(18,lines*14);
+  }
+
   async function makePdf(){
     await refreshPreview();
 
-    await Promise.all([
-      preloadImage(CURRENT_HEADER_IMAGE),
-      preloadImage(CURRENT_TOUR_IMAGE)
-    ]);
-
-    await new Promise(resolve =>
-      requestAnimationFrame(() =>
-        requestAnimationFrame(resolve)
-      )
+    const t=selectedTour();
+    const headerImage=await imageCoverDataUrl(
+      CURRENT_HEADER_IMAGE||HEADER_IMAGE_URL,
+      FALLBACK_TOUR_IMAGE,
+      794,
+      350
     );
 
-    const source=document.getElementById("voucher");
-    if(!source){
-      throw new Error("No se encontró el voucher en la página.");
+    const tourImage=await imageCoverDataUrl(
+      CURRENT_TOUR_IMAGE||t.Imagen_URL,
+      FALLBACK_TOUR_IMAGE,
+      210,
+      230
+    );
+
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({
+      orientation:"portrait",
+      unit:"px",
+      format:[794,1123],
+      compress:true
+    });
+
+    const PAGE_W=794;
+    const PAGE_H=1123;
+    const GREEN="#073b2a";
+    const INK="#153d3a";
+    const GOLD="#d4af62";
+    const CREAM="#fcf8ef";
+    const SAND="#eee3d2";
+    const LINE="#ddcfb7";
+
+    // Fondo general
+    pdfSetFill(pdf,CREAM);
+    pdf.rect(0,0,PAGE_W,PAGE_H,"F");
+
+    // Imagen superior
+    if(headerImage){
+      pdf.addImage(headerImage,"JPEG",0,0,794,350,undefined,"FAST");
+    }else{
+      pdfSetFill(pdf,"#315d5a");
+      pdf.rect(0,0,794,350,"F");
     }
 
-    /*
-     * Se crea una copia temporal dentro del viewport.
-     * La versión anterior la colocaba fuera de pantalla y algunos navegadores
-     * devolvían un canvas completamente blanco.
-     */
-    const capture=source.cloneNode(true);
-    capture.id="voucher-capture";
-    capture.style.position="fixed";
-    capture.style.left="0";
-    capture.style.top="0";
-    capture.style.width="794px";
-    capture.style.height="1123px";
-    capture.style.minHeight="1123px";
-    capture.style.maxWidth="none";
-    capture.style.margin="0";
-    capture.style.transform="none";
-    capture.style.display="block";
-    capture.style.visibility="visible";
-    capture.style.opacity="1";
-    capture.style.overflow="hidden";
-    capture.style.boxShadow="none";
-    capture.style.zIndex="2147483646";
-    capture.style.background="#fcf8ef";
-    capture.style.pointerEvents="none";
-
-    const captureHero=capture.querySelector("#hero");
-    if(captureHero){
-      captureHero.style.backgroundImage=`url("${CURRENT_HEADER_IMAGE}")`;
-      captureHero.style.backgroundColor="#315d5a";
-      captureHero.style.width="794px";
-      captureHero.style.height="350px";
+    // Banda semitransparente para legibilidad
+    if(pdf.GState){
+      pdf.saveGraphicsState();
+      pdf.setGState(new pdf.GState({opacity:0.28}));
+      pdfSetFill(pdf,GREEN);
+      pdf.rect(0,0,794,350,"F");
+      pdf.restoreGraphicsState();
     }
 
-    const captureTourImg=capture.querySelector("#tourImg");
-    if(captureTourImg){
-      captureTourImg.style.backgroundImage=`url("${CURRENT_TOUR_IMAGE}")`;
-      captureTourImg.style.backgroundColor="#d8e3df";
-    }
+    // Marca y título
+    pdfText(pdf,"LAGOONA",397,78,{
+      font:"times",
+      style:"normal",
+      size:38,
+      color:"#ffffff",
+      align:"center"
+    });
 
-    /*
-     * Capa visual breve para evitar que el usuario vea el voucher temporal.
-     * No forma parte del elemento capturado.
-     */
-    const curtain=document.createElement("div");
-    curtain.id="pdf-curtain";
-    curtain.style.position="fixed";
-    curtain.style.inset="0";
-    curtain.style.background="#f7f1e5";
-    curtain.style.zIndex="2147483647";
-    curtain.style.display="grid";
-    curtain.style.placeItems="center";
-    curtain.style.fontFamily="Jost, sans-serif";
-    curtain.style.color="#073b2a";
-    curtain.style.fontWeight="600";
-    curtain.style.letterSpacing=".08em";
-    curtain.textContent="GENERANDO VOUCHER…";
+    pdfText(pdf,"T O U R S   &   A C T I V I D A D E S",397,101,{
+      font:"helvetica",
+      style:"bold",
+      size:8,
+      color:"#f0c86c",
+      align:"center"
+    });
 
-    document.body.appendChild(capture);
-    document.body.appendChild(curtain);
+    pdfText(pdf,"Voucher de Reserva",397,160,{
+      font:"times",
+      style:"normal",
+      size:42,
+      color:"#ffffff",
+      align:"center"
+    });
 
-    try{
-      await new Promise(resolve =>
-        requestAnimationFrame(() =>
-          requestAnimationFrame(resolve)
-        )
+    // Folio
+    pdfSetFill(pdf,GREEN);
+    pdfSetDraw(pdf,GOLD);
+    pdf.setLineWidth(2);
+    pdf.roundedRect(624,298,140,90,0,10,"FD");
+
+    pdfText(pdf,"F O L I O",694,330,{
+      font:"helvetica",
+      style:"bold",
+      size:8,
+      color:"#e8d8a8",
+      align:"center"
+    });
+
+    pdfText(pdf,CURRENT_FOLIO||"POR GENERAR",694,359,{
+      font:"helvetica",
+      style:"bold",
+      size:12,
+      color:"#ffffff",
+      align:"center",
+      maxWidth:124
+    });
+
+    // Estado de reserva
+    pdfSetDraw(pdf,GOLD);
+    pdf.setLineWidth(1);
+    pdf.roundedRect(257,382,280,45,7,7,"S");
+    pdfText(pdf,`RESERVA ${val("estadoReserva").toUpperCase()}`,397,410,{
+      font:"helvetica",
+      style:"normal",
+      size:11,
+      color:INK,
+      align:"center"
+    });
+
+    // Grid central
+    const leftX=66;
+    const rightX=421;
+    const colWidth=285;
+    let leftY=470;
+    let rightY=470;
+
+    pdfSetDraw(pdf,LINE);
+    pdf.setLineWidth(0.8);
+    pdf.line(397,450,397,760);
+
+    leftY=pdfInfoItem(pdf,"Huésped",val("huesped"),leftX,leftY,colWidth);
+    leftY=pdfInfoItem(pdf,"Tour",t.Nombre_Voucher||t.Nombre_Registro||"—",leftX,leftY,colWidth);
+    leftY=pdfInfoItem(pdf,"Fecha",fmtDate(val("fechaTour")),leftX,leftY,colWidth);
+    leftY=pdfInfoItem(pdf,"Hora",fmtTime(val("horaTour")),leftX,leftY,colWidth);
+
+    rightY=pdfInfoItem(pdf,"Duración",val("duracion")||"—",rightX,rightY,colWidth);
+    rightY=pdfInfoItem(
+      pdf,
+      "Participantes",
+      val("participantes")?`${val("participantes")} personas`:"—",
+      rightX,
+      rightY,
+      colWidth
+    );
+    rightY=pdfInfoItem(
+      pdf,
+      "Punto de encuentro",
+      val("puntoEncuentro")||"—",
+      rightX,
+      rightY,
+      colWidth
+    );
+    rightY=pdfInfoItem(
+      pdf,
+      "Reservado por",
+      val("reservadoPor")||"Recepción Lagoona",
+      rightX,
+      rightY,
+      colWidth
+    );
+
+    // Sección inferior
+    const lowerX=48;
+    const lowerY=790;
+    const lowerW=698;
+    const lowerH=230;
+    const imageW=210;
+    const textW=lowerW-imageW;
+
+    pdfSetDraw(pdf,LINE);
+    pdf.setLineWidth(1);
+    pdf.rect(lowerX,lowerY,lowerW,lowerH,"S");
+
+    if(tourImage){
+      pdf.addImage(
+        tourImage,
+        "JPEG",
+        lowerX+textW,
+        lowerY,
+        imageW,
+        lowerH,
+        undefined,
+        "FAST"
       );
-
-      const rect=capture.getBoundingClientRect();
-
-      if(!Number.isFinite(rect.width) || !Number.isFinite(rect.height) ||
-         rect.width <= 0 || rect.height <= 0){
-        throw new Error(
-          `El voucher no tiene medidas válidas (${rect.width} × ${rect.height}).`
-        );
-      }
-
-      const canvas=await html2canvas(capture,{
-        scale:2,
-        width:794,
-        height:1123,
-        windowWidth:794,
-        windowHeight:1123,
-        scrollX:0,
-        scrollY:0,
-        useCORS:true,
-        allowTaint:false,
-        backgroundColor:"#fcf8ef",
-        logging:false,
-        imageTimeout:20000,
-        removeContainer:true,
-        onclone:clonedDoc=>{
-          clonedDoc.documentElement.style.width="794px";
-          clonedDoc.documentElement.style.height="1123px";
-          clonedDoc.body.style.width="794px";
-          clonedDoc.body.style.height="1123px";
-          clonedDoc.body.style.margin="0";
-          clonedDoc.body.style.background="#fcf8ef";
-
-          const clonedCurtain=clonedDoc.getElementById("pdf-curtain");
-          if(clonedCurtain){
-            clonedCurtain.remove();
-          }
-
-          const clonedCapture=clonedDoc.getElementById("voucher-capture");
-          if(clonedCapture){
-            clonedCapture.style.position="absolute";
-            clonedCapture.style.left="0";
-            clonedCapture.style.top="0";
-            clonedCapture.style.width="794px";
-            clonedCapture.style.height="1123px";
-            clonedCapture.style.minHeight="1123px";
-            clonedCapture.style.transform="none";
-            clonedCapture.style.display="block";
-            clonedCapture.style.visibility="visible";
-            clonedCapture.style.opacity="1";
-            clonedCapture.style.zIndex="1";
-          }
-        }
-      });
-
-      if(!canvas || !canvas.width || !canvas.height){
-        throw new Error("html2canvas devolvió una imagen vacía.");
-      }
-
-      /*
-       * Verifica que la imagen no sea completamente blanca.
-       * Se muestrean varios puntos antes de crear el PDF.
-       */
-      const context=canvas.getContext("2d");
-      const samplePoints=[
-        [20,20],
-        [canvas.width/2,40],
-        [canvas.width/2,canvas.height/4],
-        [canvas.width/2,canvas.height/2],
-        [canvas.width-20,canvas.height-20]
-      ];
-
-      let nonWhitePixelFound=false;
-      for(const [x,y] of samplePoints){
-        const pixel=context.getImageData(
-          Math.max(0,Math.floor(x)),
-          Math.max(0,Math.floor(y)),
-          1,
-          1
-        ).data;
-
-        if(pixel[3] > 0 && (pixel[0] < 248 || pixel[1] < 248 || pixel[2] < 248)){
-          nonWhitePixelFound=true;
-          break;
-        }
-      }
-
-      if(!nonWhitePixelFound){
-        throw new Error("La captura del voucher resultó vacía.");
-      }
-
-      const imageData=canvas.toDataURL("image/jpeg",.95);
-      if(!imageData || imageData==="data:,"){
-        throw new Error("No fue posible convertir el voucher en imagen.");
-      }
-
-      const {jsPDF}=window.jspdf;
-      const pdf=new jsPDF({
-        orientation:"portrait",
-        unit:"px",
-        format:[794,1123],
-        compress:true
-      });
-
-      pdf.addImage(imageData,"JPEG",0,0,794,1123);
-      pdf.save(
-        `${CURRENT_FOLIO}_${val("huesped").replace(/\s+/g,"_")}.pdf`
-      );
-
-      return pdf.output("datauristring");
-    } finally {
-      if(curtain.parentNode){
-        curtain.parentNode.removeChild(curtain);
-      }
-      if(capture.parentNode){
-        capture.parentNode.removeChild(capture);
-      }
+    }else{
+      pdfSetFill(pdf,"#d8e3df");
+      pdf.rect(lowerX+textW,lowerY,imageW,lowerH,"F");
     }
+
+    let detailY=824;
+    const detailX=68;
+    const labelWidth=142;
+    const valueWidth=285;
+
+    let rowHeight=pdfDetailRow(
+      pdf,"INCLUYE",val("incluye")||"—",
+      detailX,detailY,labelWidth,valueWidth
+    );
+    detailY+=rowHeight+10;
+    pdfSetDraw(pdf,"#e4d8c6");
+    pdf.line(detailX,detailY-4,lowerX+textW-18,detailY-4);
+
+    rowHeight=pdfDetailRow(
+      pdf,"RECOMENDACIONES",val("recomendaciones")||"—",
+      detailX,detailY+8,labelWidth,valueWidth
+    );
+    detailY+=rowHeight+18;
+    pdf.line(detailX,detailY-4,lowerX+textW-18,detailY-4);
+
+    pdfDetailRow(
+      pdf,
+      "TOTAL POR PAGAR",
+      money(val("total"),val("moneda")),
+      detailX,
+      detailY+10,
+      labelWidth,
+      valueWidth
+    );
+
+    detailY+=38;
+    pdf.line(detailX,detailY-4,lowerX+textW-18,detailY-4);
+
+    pdfDetailRow(
+      pdf,
+      "MÉTODO DE PAGO",
+      val("metodoPago")||"—",
+      detailX,
+      detailY+10,
+      labelWidth,
+      valueWidth
+    );
+
+    // Contacto
+    pdfText(pdf,PUBLIC_CONFIG.telefono||"+52 984 241 1410",58,1054,{
+      font:"times",
+      style:"normal",
+      size:12,
+      color:INK
+    });
+
+    pdfText(pdf,PUBLIC_CONFIG.email||"grupolagunacollection@gmail.com",736,1054,{
+      font:"times",
+      style:"normal",
+      size:12,
+      color:INK,
+      align:"right"
+    });
+
+    // Pie
+    pdfSetFill(pdf,SAND);
+    pdf.rect(0,1074,794,49,"F");
+    pdfText(pdf,"Presenta este voucher al iniciar tu experiencia.",397,1096,{
+      font:"times",
+      style:"normal",
+      size:13,
+      color:INK,
+      align:"center"
+    });
+    pdfText(pdf,"Gracias por reservar con Lagoona.",397,1115,{
+      font:"times",
+      style:"italic",
+      size:12,
+      color:"#c89849",
+      align:"center"
+    });
+
+    const safeName=val("huesped").replace(/\s+/g,"_")||"huesped";
+    pdf.save(`${CURRENT_FOLIO}_${safeName}.pdf`);
+    return pdf.output("datauristring");
   }
 
   function uploadPdf(pdfData){
